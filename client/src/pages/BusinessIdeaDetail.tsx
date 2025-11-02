@@ -126,7 +126,7 @@ const BusinessIdeaDetail: React.FC = () => {
     
     try {
       await api.delete(`/business/ideas/${id}`);
-      navigate('/ideas');
+      navigate('/app/ideas');
     } catch (err: any) {
       setError('Failed to delete business idea');
       console.error('Delete error:', err);
@@ -144,7 +144,7 @@ const BusinessIdeaDetail: React.FC = () => {
       });
       
       // Navigate to business plan page or show success message
-      navigate(`/plans/${response.data.planId || idea.id}`);
+      navigate(`/app/plans/${response.data.planId || idea.id}`);
     } catch (err: any) {
       setError('Failed to generate business plan');
       console.error('Generate business plan error:', err);
@@ -205,7 +205,7 @@ const BusinessIdeaDetail: React.FC = () => {
         </Alert>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/ideas')}
+          onClick={() => navigate('/app/ideas')}
         >
           Back to Ideas
         </Button>

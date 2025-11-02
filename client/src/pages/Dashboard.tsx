@@ -121,7 +121,7 @@ const Dashboard: React.FC = () => {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/ideas')}
+          onClick={() => navigate('/app/ideas')}
           size="large"
         >
           New Idea
@@ -304,7 +304,7 @@ const Dashboard: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<LightbulbIcon />}
-                  onClick={() => navigate('/ideas')}
+                  onClick={() => navigate('/app/ideas')}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
                 >
@@ -313,7 +313,7 @@ const Dashboard: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<ChatIcon />}
-                  onClick={() => navigate('/chat')}
+                  onClick={() => navigate('/app/chat')}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
                 >
@@ -322,7 +322,7 @@ const Dashboard: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/ideas')}
+                  onClick={() => navigate('/app/ideas')}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
                 >

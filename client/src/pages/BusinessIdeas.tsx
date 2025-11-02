@@ -154,7 +154,7 @@ const BusinessIdeas: React.FC = () => {
       });
       
       // Navigate to business plan page or show success message
-      navigate(`/plans/${response.data.planId || ideaId}`);
+      navigate(`/app/plans/${response.data.planId || ideaId}`);
     } catch (err: any) {
       setError('Failed to generate business plan');
       console.error('Generate business plan error:', err);
@@ -498,14 +498,14 @@ const BusinessIdeas: React.FC = () => {
                   <Button
                     size="small"
                     startIcon={<VisibilityIcon />}
-                    onClick={() => navigate(`/ideas/${idea.id}`)}
+                    onClick={() => navigate(`/app/ideas/${idea.id}`)}
                   >
                     View Details
                   </Button>
                   <Box>
                     <IconButton
                       size="small"
-                      onClick={() => navigate(`/ideas/${idea.id}`)}
+                      onClick={() => navigate(`/app/ideas/${idea.id}`)}
                     >
                       <EditIcon />
                     </IconButton>

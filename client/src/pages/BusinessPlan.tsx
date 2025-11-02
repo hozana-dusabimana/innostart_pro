@@ -92,62 +92,207 @@ const BusinessPlan: React.FC = () => {
     
     let formatted = content;
     
-    // First, handle tables before converting line breaks
-    const tableRegex = /(\|.*\|[\r\n]+)+/g;
-    formatted = formatted.replace(tableRegex, (match) => {
-      const lines = match.trim().split(/\r?\n/).filter(line => line.trim() && line.includes('|'));
-      if (lines.length < 2) return match;
+    // Handle escaped newlines first
+    formatted = formatted.replace(/\\n/g, '\n');
+    
+    // More robust table detection - find all table blocks
+    // Tables are sequences of lines containing | that are separated by at most one blank line
+    const lines = formatted.split(/\r?\n/);
+    const tableBlocks: { start: number; end: number }[] = [];
+    let tableStart = -1;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const hasPipe = line.includes('|') && line.split('|').length >= 3;
       
-      let tableHtml = '<div class="financial-table-container"><table class="financial-table">';
+      if (hasPipe) {
+        if (tableStart === -1) {
+          tableStart = i;
+        }
+      } else {
+        // Empty line or non-table line
+        if (tableStart !== -1) {
+          // Check if this is just a blank line (continue table) or end of table
+          if (line === '' && i + 1 < lines.length && lines[i + 1].trim().includes('|')) {
+            // Continue table
+            continue;
+          } else {
+            // End of table
+            tableBlocks.push({ start: tableStart, end: i - 1 });
+            tableStart = -1;
+          }
+        }
+      }
+    }
+    
+    // Close any open table at end
+    if (tableStart !== -1) {
+      tableBlocks.push({ start: tableStart, end: lines.length - 1 });
+    }
+    
+    // Process tables in reverse order to maintain indices
+    for (let blockIdx = tableBlocks.length - 1; blockIdx >= 0; blockIdx--) {
+      const block = tableBlocks[blockIdx];
+      const tableLines = lines.slice(block.start, block.end + 1).filter(line => line.trim().includes('|'));
       
-      lines.forEach((line, index) => {
-        const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
-        if (cells.length === 0) return;
-        
-        if (index === 0) {
-          // Header row
-          tableHtml += '<thead><tr>';
-          cells.forEach(cell => {
-            tableHtml += `<th>${cell}</th>`;
+      if (tableLines.length < 2) continue;
+      
+      // Find separator line
+      let separatorIndex = -1;
+      let alignments: ('left' | 'center' | 'right')[] = [];
+      
+      for (let i = 0; i < tableLines.length; i++) {
+        const trimmed = tableLines[i].trim();
+        if (trimmed.match(/^\|[\s:|-]+\|$/)) {
+          separatorIndex = i;
+          const parts = trimmed.split('|').filter(p => p.trim());
+          alignments = parts.map(part => {
+            const trimmedPart = part.trim();
+            if (trimmedPart.startsWith(':') && trimmedPart.endsWith(':')) return 'center';
+            if (trimmedPart.endsWith(':')) return 'right';
+            return 'left';
           });
-          tableHtml += '</tr></thead><tbody>';
-        } else {
-          // Data row
+          break;
+        }
+      }
+      
+      // Build table HTML
+      const dataLines = tableLines.filter((_, idx) => idx !== separatorIndex);
+      if (dataLines.length < 1) continue;
+      
+      let tableHtml = '<div class="financial-table-container"><table class="financial-table"><thead><tr>';
+      
+      // Parse header
+      const headerLine = dataLines[0];
+      const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+      
+      headers.forEach((header, idx) => {
+        const cleanHeader = header.replace(/^:+|:+$/g, '').trim();
+        const align = alignments[idx] || (idx === 0 ? 'left' : 'right');
+        tableHtml += `<th style="text-align: ${align}; padding: 12px 16px; font-weight: bold; border-bottom: 2px solid #ddd;">${cleanHeader}</th>`;
+      });
+      tableHtml += '</tr></thead><tbody>';
+      
+      // Parse data rows
+      for (let i = 1; i < dataLines.length; i++) {
+        const rowCells = dataLines[i].split('|').map(c => c.trim()).filter(c => c);
+        if (rowCells.length > 0) {
+          while (rowCells.length < headers.length) {
+            rowCells.push('');
+          }
+          
           tableHtml += '<tr>';
-          cells.forEach(cell => {
-            const isNumeric = /^[\d,.-]+$/.test(cell.replace(/[()]/g, ''));
-            const isNegative = cell.startsWith('(') && cell.endsWith(')');
-            const cellClass = isNumeric ? (isNegative ? 'negative-value' : 'numeric-value') : '';
-            tableHtml += `<td class="${cellClass}">${cell}</td>`;
+          rowCells.slice(0, headers.length).forEach((cell, idx) => {
+            const align = alignments[idx] || (idx === 0 ? 'left' : 'right');
+            
+            // Check if cell is numeric
+            const cellTrimmed = cell.trim();
+            const numericMatch = cellTrimmed.match(/^[\s\d,.-]+(?:\.\d+)?\s*(RWF)?$/i);
+            const isNumeric = numericMatch !== null && idx > 0;
+            const isNegative = cellTrimmed.startsWith('-') || (cellTrimmed.startsWith('(') && cellTrimmed.endsWith(')'));
+            
+            let cellClass = '';
+            let cellStyle = `text-align: ${align}; padding: 10px 16px;`;
+            
+            if (isNumeric) {
+              cellClass = isNegative ? 'negative-value' : 'numeric-value';
+              cellStyle += ' font-family: "Courier New", monospace; font-weight: 500;';
+              // Format numbers
+              const numStr = cellTrimmed.replace(/[^\d.-]/g, '');
+              if (numStr && !isNaN(parseFloat(numStr))) {
+                const formattedNum = parseFloat(numStr).toLocaleString('en-US');
+                cell = cellTrimmed.replace(/[\d,.-]+/, formattedNum);
+              }
+            } else {
+              // Handle bold/italic text
+              if (cell.includes('*')) {
+                cell = cell.replace(/\*([^*]+?)\*/g, '<strong>$1</strong>');
+                if (idx === 0 || cell.includes('<strong>')) {
+                  cellStyle += ' font-weight: bold; background-color: rgba(46, 125, 50, 0.05);';
+                }
+              }
+            }
+            
+            tableHtml += `<td class="${cellClass}" style="${cellStyle}">${cell}</td>`;
           });
           tableHtml += '</tr>';
         }
-      });
+      }
       
       tableHtml += '</tbody></table></div>';
-      return tableHtml;
-    });
+      
+      // Replace the table lines in the lines array
+      lines.splice(block.start, block.end - block.start + 1, tableHtml);
+    }
     
-    // Convert line breaks to HTML
-    formatted = formatted.replace(/\n/g, '<br>');
+    // Join lines back together after all table replacements
+    formatted = lines.join('\n');
     
-    // Convert bullet points to HTML lists
-    formatted = formatted.replace(/^• (.+)$/gm, '<li>$1</li>');
+    // Convert markdown-style bullet lists (*   item)
+    const contentLines = formatted.split('\n');
+    let inList = false;
+    let listItems: string[] = [];
+    let result: string[] = [];
     
-    // Convert bold text patterns
-    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    for (let i = 0; i < contentLines.length; i++) {
+      const line = contentLines[i];
+      const listMatch = line.match(/^\*   (.+)$/);
+      
+      if (listMatch) {
+        if (!inList) {
+          inList = true;
+          listItems = [];
+        }
+        listItems.push(listMatch[1]);
+      } else {
+        if (inList) {
+          // Close list
+          result.push('<ul style="margin: 16px 0; padding-left: 30px; list-style-type: disc; text-align: left;">');
+          listItems.forEach(item => {
+            result.push(`<li style="margin: 8px 0; line-height: 1.6; text-align: left;">${item}</li>`);
+          });
+          result.push('</ul>');
+          listItems = [];
+          inList = false;
+        }
+        result.push(line);
+      }
+    }
     
-    // Convert section headers with special styling
-    formatted = formatted.replace(/^([A-Z][^:]+):$/gm, '<h3 class="section-header">$1</h3>');
+    // Close any remaining list
+    if (inList) {
+      result.push('<ul style="margin: 16px 0; padding-left: 30px; list-style-type: disc; text-align: left;">');
+      listItems.forEach(item => {
+        result.push(`<li style="margin: 8px 0; line-height: 1.6; text-align: left;">${item}</li>`);
+      });
+      result.push('</ul>');
+    }
     
-    // Convert assumptions section
-    formatted = formatted.replace(/^Assumptions:$/gm, '<div class="assumptions-section"><h3 class="section-header">Assumptions</h3>');
+    formatted = result.join('\n');
     
-    // Convert break-even analysis
-    formatted = formatted.replace(/^Break-Even Analysis:$/gm, '<div class="break-even-section"><h3 class="section-header">Break-Even Analysis</h3>');
+    // Convert section headers (lines ending with colon, on their own line)
+    formatted = formatted.replace(/^([A-Z][^:\n]+):\s*$/gm, '<h3 style="color: #2E7D32; font-weight: 600; margin-top: 28px; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; font-size: 1.25rem;">$1</h3>');
     
-    // Convert funding requirements
-    formatted = formatted.replace(/^Funding Requirements:$/gm, '<div class="funding-section"><h3 class="section-header">Funding Requirements</h3>');
+    // Convert bold text (**text**)
+    formatted = formatted.replace(/\*\*([^*\n]+?)\*\*/g, '<strong style="font-weight: 600; color: #333;">$1</strong>');
+    
+    // Convert italic text (*text* but not if it's a list item marker)
+    // First, protect list markers
+    formatted = formatted.replace(/^\*   /gm, 'LIST_MARKER_PLACEHOLDER ');
+    formatted = formatted.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/LIST_MARKER_PLACEHOLDER /g, '*   ');
+    
+    // Convert paragraph breaks (double line breaks)
+    formatted = formatted.split(/\n\n+/).map(para => {
+      para = para.trim();
+      if (!para || para.startsWith('<') || para.match(/^<[h|u|t]/)) {
+        return para; // Don't wrap HTML tags or lists/tables
+      }
+      return `<p style="margin: 14px 0; line-height: 1.7; text-align: left;">${para}</p>`;
+    }).join('\n\n');
+    
+    // Convert single line breaks to <br> (but not inside HTML tags)
+    formatted = formatted.replace(/\n(?!<[^>]*>)/g, '<br>');
     
     return formatted;
   };
@@ -171,10 +316,39 @@ const BusinessPlan: React.FC = () => {
     try {
       const response = await api.get(`/ai/business-plan/${id}`);
       setBusinessIdea(response.data.businessIdea);
-      setBusinessPlan(response.data.businessPlan);
+      // Ensure business plan object has all required fields
+      const plan = response.data.businessPlan;
+      if (plan) {
+        setBusinessPlan({
+          id: plan.id,
+          business_idea_id: plan.business_idea_id,
+          executive_summary: plan.executive_summary || null,
+          market_analysis: plan.market_analysis || null,
+          financial_projections: plan.financial_projections || null,
+          marketing_strategy: plan.marketing_strategy || null,
+          operations_plan: plan.operations_plan || null,
+          risk_analysis: plan.risk_analysis || null,
+        });
+      } else {
+        // If plan doesn't exist, create a basic structure
+        setBusinessPlan({
+          id: parseInt(id || '0'),
+          business_idea_id: response.data.businessIdea?.id || 0,
+          executive_summary: null,
+          market_analysis: null,
+          financial_projections: null,
+          marketing_strategy: null,
+          operations_plan: null,
+          risk_analysis: null,
+        });
+      }
     } catch (err: any) {
-      setError('Failed to load business plan');
-      console.error('Business plan fetch error:', err);
+      if (err.response?.status === 404) {
+        setError('Business plan not found. Please generate a business plan first.');
+      } else {
+        setError('Failed to load business plan');
+        console.error('Business plan fetch error:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -211,21 +385,39 @@ const BusinessPlan: React.FC = () => {
   };
 
   const handleGenerateWithAI = async (section: string) => {
-    if (!id) return;
+    if (!id || !businessIdea) return;
     
     setAiGenerating(true);
+    setError('');
     try {
       const response = await api.post('/ai/generate-business-plan-section', {
         section,
-        businessIdeaId: parseInt(id),
+        businessIdeaId: businessIdea.id,
       });
       
-      setBusinessPlan(prev => prev ? {
-        ...prev,
-        [section]: response.data.content,
-      } : null);
+      const generatedContent = response.data.content;
+      
+      // Update local state
+      setBusinessPlan(prev => ({
+        ...prev || {} as BusinessPlanData,
+        id: prev?.id || parseInt(id),
+        business_idea_id: prev?.business_idea_id || businessIdea.id,
+        [section]: generatedContent,
+      } as BusinessPlanData));
+      
+      // Also save to database
+      try {
+        await api.put(`/business/plans/${id}/sections/${section}`, {
+          content: generatedContent
+        });
+      } catch (saveErr: any) {
+        console.warn('Failed to save generated section to database:', saveErr);
+        // Don't throw - content is still in local state
+      }
+      
     } catch (err: any) {
-      setError('Failed to generate section with AI');
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate section with AI';
+      setError(errorMessage);
       console.error('AI generation error:', err);
     } finally {
       setAiGenerating(false);
@@ -267,7 +459,7 @@ const BusinessPlan: React.FC = () => {
         <Alert severity="error">{error || 'Business idea not found'}</Alert>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/ideas')}
+          onClick={() => navigate('/app/ideas')}
           sx={{ mt: 2 }}
         >
           Back to Ideas
@@ -279,7 +471,7 @@ const BusinessPlan: React.FC = () => {
   return (
     <Box>
       <Box display="flex" alignItems="center" mb={4}>
-        <IconButton onClick={() => navigate('/ideas')} sx={{ mr: 2 }}>
+        <IconButton onClick={() => navigate('/app/ideas')} sx={{ mr: 2 }}>
           <ArrowBackIcon />
         </IconButton>
         <Box>
@@ -434,13 +626,14 @@ const BusinessPlan: React.FC = () => {
                         variant="body1" 
                         component="div"
                         sx={{ 
-                          whiteSpace: 'pre-wrap',
                           lineHeight: 1.6,
+                          textAlign: 'left',
                           '& h1, & h2, & h3, & h4, & h5, & h6': {
                             fontWeight: 'bold',
                             marginTop: 2,
                             marginBottom: 1,
-                            color: 'primary.main'
+                            color: 'primary.main',
+                            textAlign: 'left'
                           },
                           '& strong, & b': {
                             fontWeight: 'bold',
@@ -448,10 +641,12 @@ const BusinessPlan: React.FC = () => {
                           },
                           '& ul, & ol': {
                             paddingLeft: 3,
-                            marginBottom: 2
+                            marginBottom: 2,
+                            textAlign: 'left'
                           },
                           '& li': {
-                            marginBottom: 0.5
+                            marginBottom: 0.5,
+                            textAlign: 'left'
                           },
                           '& table': {
                             width: '100%',
@@ -642,7 +837,7 @@ const BusinessPlan: React.FC = () => {
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/ideas')}
+          onClick={() => navigate('/app/ideas')}
         >
           Back to Ideas
         </Button>

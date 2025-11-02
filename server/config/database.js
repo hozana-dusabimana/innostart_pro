@@ -132,17 +132,29 @@ const query = async (text, params) => {
   try {
     const [rows, fields] = await pool.execute(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: rows.length });
     
-    // For INSERT queries, we need to get the insertId from the result
-    const result = { rows, rowCount: rows.length };
-    if (text.trim().toUpperCase().startsWith('INSERT')) {
-      // Get the insertId from the MySQL2 result - it's in the fields object
-      result.insertId = fields?.insertId || rows?.insertId;
-      console.log('Insert result - fields:', fields, 'rows:', rows, 'insertId:', result.insertId);
+    // MySQL2 execute() returns [rows, fields]
+    // For SELECT: rows is array of row objects
+    // For INSERT/UPDATE/DELETE: rows is ResultSetHeader object with insertId, affectedRows, etc.
+    const isSelectQuery = text.trim().toUpperCase().startsWith('SELECT');
+    const isInsertQuery = text.trim().toUpperCase().startsWith('INSERT');
+    
+    if (isSelectQuery) {
+      // For SELECT queries, rows is an array of row objects
+      console.log('Executed SELECT query', { text: text.substring(0, 50), duration, rows: rows.length });
+      return { rows: Array.isArray(rows) ? rows : [], rowCount: Array.isArray(rows) ? rows.length : 0 };
+    } else if (isInsertQuery) {
+      // For INSERT queries, rows is a ResultSetHeader object
+      const insertId = rows?.insertId || null;
+      const affectedRows = rows?.affectedRows || 0;
+      console.log('Executed INSERT query', { text: text.substring(0, 50), duration, insertId, affectedRows });
+      return { rows: [], rowCount: affectedRows, insertId: insertId };
+    } else {
+      // For UPDATE, DELETE queries, rows is a ResultSetHeader object
+      const affectedRows = rows?.affectedRows || 0;
+      console.log('Executed query', { text: text.substring(0, 50), duration, affectedRows });
+      return { rows: [], rowCount: affectedRows, insertId: rows?.insertId || null };
     }
-    
-    return result;
   } catch (error) {
     console.error('Database query error:', error);
     throw error;

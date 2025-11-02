@@ -549,7 +549,7 @@ const Chat: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<LightbulbIcon />}
-                  onClick={() => navigate('/ideas')}
+                  onClick={() => navigate('/app/ideas')}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
                 >

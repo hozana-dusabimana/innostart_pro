@@ -64,7 +64,7 @@ router.post('/generate-ideas', authenticateToken, [
 // Chat with AI
 router.post('/chat', authenticateToken, [
   body('message').trim().isLength({ min: 1 }).withMessage('Message is required'),
-  body('conversationId').optional().isUUID()
+  body('conversationId').optional().isInt().withMessage('Conversation ID must be an integer')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

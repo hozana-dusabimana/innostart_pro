@@ -65,7 +65,7 @@ const Register: React.FC = () => {
         phone: formData.phone,
         location: formData.location,
       });
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {

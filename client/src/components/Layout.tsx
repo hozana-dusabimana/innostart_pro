@@ -34,10 +34,10 @@ import { useAuth } from '../contexts/AuthContext';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Business Ideas', icon: <LightbulbIcon />, path: '/ideas' },
-  { text: 'AI Chat', icon: <ChatIcon />, path: '/chat' },
-  { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/app/dashboard' },
+  { text: 'Business Ideas', icon: <LightbulbIcon />, path: '/app/ideas' },
+  { text: 'AI Chat', icon: <ChatIcon />, path: '/app/chat' },
+  { text: 'Profile', icon: <PersonIcon />, path: '/app/profile' },
 ];
 
 const Layout: React.FC = () => {
@@ -191,7 +191,7 @@ const Layout: React.FC = () => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={() => handleNavigation('/profile')}>
+        <MenuItem onClick={() => handleNavigation('/app/profile')}>
           <PersonIcon sx={{ mr: 1 }} />
           Profile
         </MenuItem>
