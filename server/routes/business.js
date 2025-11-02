@@ -294,15 +294,65 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
     const statusCounts = {};
     statusResult.rows.forEach(row => {
-      statusCounts[row.status] = row.count;
+      statusCounts[row.status] = Number(row.count) || 0;
+    });
+
+    // Get financial summary
+    const financialResult = await query(
+      `SELECT 
+        COALESCE(SUM(initial_investment), 0) as totalInvestment,
+        COALESCE(AVG(success_probability), 0) as averageSuccessProbability
+       FROM business_ideas 
+       WHERE user_id = ?`,
+      [req.user.id]
+    );
+
+    // Get recent activity (recent ideas with their details)
+    const recentActivityResult = await query(
+      `SELECT id, title, status, updated_at 
+       FROM business_ideas 
+       WHERE user_id = ? 
+       ORDER BY updated_at DESC 
+       LIMIT 5`,
+      [req.user.id]
+    );
+
+    // Extract values properly (MySQL returns BigInt for SUM/COUNT, need to convert)
+    const totalInvestment = financialResult.rows[0]?.totalInvestment
+      ? Number(financialResult.rows[0].totalInvestment)
+      : 0;
+    const avgSuccess = financialResult.rows[0]?.averageSuccessProbability
+      ? Number(financialResult.rows[0].averageSuccessProbability)
+      : 0;
+
+    // Convert COUNT values (MySQL may return as string or BigInt)
+    const totalIdeas = Number(ideasResult.rows[0]?.total) || 0;
+    const totalPlans = Number(plansResult.rows[0]?.total) || 0;
+    const recentIdeas = Number(recentResult.rows[0]?.count) || 0;
+
+    console.log('Dashboard data:', {
+      userId: req.user.id,
+      totalIdeas,
+      totalPlans,
+      recentIdeas,
+      totalInvestment,
+      avgSuccess,
+      financialResult: financialResult.rows[0],
+      recentActivity: recentActivityResult.rows?.length || 0,
+      statusCounts
     });
 
     res.json({
-      totalIdeas: ideasResult.rows[0].total,
-      totalPlans: plansResult.rows[0].total,
-      recentIdeas: recentResult.rows[0].count,
+      totalIdeas: totalIdeas,
+      totalPlans: totalPlans,
+      recentIdeas: recentIdeas,
       ideasByStatus: statusCounts,
-      topIndustries: industryResult.rows
+      topIndustries: industryResult.rows || [],
+      financialSummary: {
+        totalInvestment: totalInvestment,
+        averageSuccessProbability: avgSuccess
+      },
+      recentActivity: recentActivityResult.rows || []
     });
 
   } catch (error) {

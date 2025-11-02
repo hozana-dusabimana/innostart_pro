@@ -217,7 +217,7 @@ const BusinessIdeaDetail: React.FC = () => {
     <Box>
       {/* Header */}
       <Box display="flex" alignItems="center" mb={3}>
-        <IconButton onClick={() => navigate('/ideas')} sx={{ mr: 2 }}>
+        <IconButton onClick={() => navigate('/app/ideas')} sx={{ mr: 2 }}>
           <ArrowBackIcon />
         </IconButton>
         <Box flexGrow={1}>

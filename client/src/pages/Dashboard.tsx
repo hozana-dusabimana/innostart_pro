@@ -39,6 +39,11 @@ const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Format currency in RWF
+  const formatCurrency = (amount: number) => {
+    return `${amount.toLocaleString()} RWF`;
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -46,7 +51,7 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       const response = await api.get('/business/dashboard');
-      setDashboardData(response.data.dashboard);
+      setDashboardData(response.data);
     } catch (err: any) {
       setError('Failed to load dashboard data');
       console.error('Dashboard error:', err);
@@ -175,7 +180,9 @@ const Dashboard: React.FC = () => {
                     Total Investment
                   </Typography>
                   <Typography variant="h4">
-                    ${dashboardData?.financialSummary?.totalInvestment?.toLocaleString() || 0}
+                    {dashboardData?.financialSummary?.totalInvestment 
+                      ? formatCurrency(dashboardData.financialSummary.totalInvestment) 
+                      : '0 RWF'}
                   </Typography>
                 </Box>
                 <MoneyIcon sx={{ fontSize: 40, color: 'success.main' }} />
@@ -282,7 +289,7 @@ const Dashboard: React.FC = () => {
                     />
                     <IconButton
                       size="small"
-                      onClick={() => navigate(`/ideas/${activity.id}`)}
+                      onClick={() => navigate(`/app/ideas/${activity.id}`)}
                     >
                       <ArrowForwardIcon />
                     </IconButton>

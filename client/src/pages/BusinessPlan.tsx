@@ -67,6 +67,11 @@ const BusinessPlan: React.FC = () => {
   const [exportingPDF, setExportingPDF] = useState(false);
   const { api } = useApi();
 
+  // Format currency in RWF
+  const formatCurrency = (amount: number) => {
+    return `${amount.toLocaleString()} RWF`;
+  };
+
   // Helper function to format content for better display
   const formatContentForDisplay = (content: string | null) => {
     if (!content) return '';
@@ -508,7 +513,7 @@ const BusinessPlan: React.FC = () => {
                 <Grid item xs={6}>
                   <Box textAlign="center" p={2} bgcolor="grey.100" borderRadius={1}>
                     <Typography variant="h6" color="primary">
-                      ${businessIdea.initial_investment.toLocaleString()}
+                      {formatCurrency(businessIdea.initial_investment)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Initial Investment
@@ -518,7 +523,7 @@ const BusinessPlan: React.FC = () => {
                 <Grid item xs={6}>
                   <Box textAlign="center" p={2} bgcolor="grey.100" borderRadius={1}>
                     <Typography variant="h6" color="success.main">
-                      ${businessIdea.expected_revenue.toLocaleString()}
+                      {formatCurrency(businessIdea.expected_revenue)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Expected Revenue
