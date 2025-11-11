@@ -42,6 +42,13 @@ interface BusinessIdea {
   industry: string;
 }
 
+interface Conversation {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const { api } = useApi();
@@ -60,11 +67,13 @@ const Chat: React.FC = () => {
   const [businessSector, setBusinessSector] = useState('');
   const [customSector, setCustomSector] = useState('');
   const [showContextSetup, setShowContextSetup] = useState(true);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchBusinessIdeas();
-    scrollToBottom();
+    fetchExistingConversation();
   }, []);
 
   useEffect(() => {
@@ -81,6 +90,40 @@ const Chat: React.FC = () => {
       setBusinessIdeas(response.data.ideas);
     } catch (err) {
       console.error('Failed to fetch business ideas:', err);
+    }
+  };
+
+  const fetchExistingConversation = async () => {
+    try {
+      const response = await api.get('/ai/conversations', {
+        params: { limit: 1, offset: 0 }
+      });
+      const fetchedConversations: Conversation[] = response.data?.conversations || [];
+
+      if (fetchedConversations.length > 0) {
+        const latestConversation = fetchedConversations[0];
+        setConversationId(latestConversation.id);
+        await loadConversationMessages(latestConversation.id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+    }
+  };
+
+  const loadConversationMessages = async (convId: number) => {
+    setLoadingHistory(true);
+    try {
+      const response = await api.get(`/ai/conversations/${convId}/messages`);
+      const history = (response.data?.messages || []).map((msg: any) => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+        timestamp: msg.created_at || new Date().toISOString(),
+      })) as Message[];
+      setMessages(history);
+    } catch (err) {
+      console.error('Failed to load conversation messages:', err);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -109,6 +152,7 @@ const Chat: React.FC = () => {
         location: finalLocation,
         budget: finalBudget,
         businessSector: finalSector,
+        conversationId: conversationId ?? undefined,
       });
 
       const aiMessage: Message = {
@@ -118,6 +162,10 @@ const Chat: React.FC = () => {
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      const newConversationId = response.data?.conversationId;
+      if (newConversationId) {
+        setConversationId(newConversationId);
+      }
     } catch (err: any) {
       setError('Failed to get AI response. Please try again.');
       console.error('Chat error:', err);
@@ -136,11 +184,13 @@ const Chat: React.FC = () => {
   const handleClearChat = () => {
     setMessages([]);
     setError('');
+    setConversationId(null);
   };
 
   const handleIdeaChange = (ideaId: number | '') => {
     setSelectedIdea(ideaId);
     setMessages([]);
+    setConversationId(null);
   };
 
   const suggestedQuestions = [
@@ -386,7 +436,22 @@ const Chat: React.FC = () => {
         <Grid item xs={12} md={8}>
           <Card sx={{ height: 600, display: 'flex', flexDirection: 'column' }}>
             <CardContent sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
-              {messages.length === 0 ? (
+              {loadingHistory ? (
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                  height="100%"
+                  gap={2}
+                  p={4}
+                >
+                  <CircularProgress />
+                  <Typography variant="body2" color="text.secondary">
+                    Loading your previous messages...
+                  </Typography>
+                </Box>
+              ) : messages.length === 0 ? (
                 <Box
                   display="flex"
                   flexDirection="column"
